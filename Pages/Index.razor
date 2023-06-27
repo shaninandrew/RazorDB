@@ -1,3 +1,195 @@
 ﻿@page "/"
+@code{
 
-<h1>Hello, world!</h1>
+
+
+    static public int Update_sum_in_cache()
+    {
+        VeningDatabase database = new VeningDatabase();
+        int _sum_in_cache = database.coins.Where<Coin>(i => i.storage == Storage.cash).Sum<Coin>(i => i.CoinNum);
+        database.Dispose();
+        return (_sum_in_cache);
+    }
+
+    static public int Update_sum_in_payback()
+    {
+        VeningDatabase database = new VeningDatabase();
+        int _sum_in_pb = database.coins.Where<Coin>(i => i.storage == Storage.payback).Sum<Coin>(i => i.CoinNum);
+        database.Dispose();
+        return (_sum_in_pb);
+    }
+
+    static public int Update_sum_in_bank()
+    {
+        VeningDatabase database = new VeningDatabase();
+        int _sum_in_bank = database.coins.Where<Coin>(i => i.storage == Storage.bank).Sum<Coin>(i => i.CoinNum);
+        database.Dispose();
+        return (_sum_in_bank);
+    }
+
+
+
+    static public List<Good> ShowGoods()
+    {
+        //сколько денег доступно
+        int avail_money = Update_sum_in_cache();
+
+        VeningDatabase database = new VeningDatabase();
+
+        List<Good> result = new List<Good>();
+
+        //отбираем товары на которые хватает денег
+        foreach (Good g in database.warhouse)
+        {
+            if (g.Price <= avail_money)
+                result.Add(g);
+        }
+
+        return (result);
+    }
+
+
+
+    int sum_in_cache = Update_sum_in_cache();
+    int sum_in_bank = Update_sum_in_bank();
+    int sum_in_payback = Update_sum_in_payback();
+
+    string log = "";
+
+}
+
+<div>
+<h1>Вендинговый аппарат</h1>
+</div>
+<table>
+ <tr>
+
+ <td valign="top">
+<div>
+ <b>Кол-во монет в </b>
+<table valign="center">
+    <tr> <td> приемнике</td>        <td> банке</td>                  <td>лотке </td>  </tr>
+    <tr> <td> @sum_in_cache</td>    <td> @sum_in_bank </td>          <td> @sum_in_payback </td> </tr>
+</table>
+</div>
+
+<div>
+<button  @onclick="toss_a_coin">Закинуть монету 1р</button>
+<button @onclick="toss_a_coin_5">Закинуть монету 5р</button>
+</div>
+
+<br />
+<br />
+<div>
+<button @onclick="drop_a_coin">Отдать сдачу</button>
+ В лотке @sum_in_payback рублей.
+ <BR />
+</div>
+<br />
+<button enabled="@sum_in_payback==0" @onclick="take_a_coin">Забрать сдачу</button>
+</td>
+<td valign="top">
+
+            <b>Товары</b><br />
+            @foreach (Good g in ShowGoods())
+            {
+                <span> @g.Name</span>
+                <span>@g.Price р. </span>
+                <span>@g.Count шт.  </span>
+
+                <button @onclick="@(()=>buy(@g.Id))">Купить</button> <br />
+            }
+
+          
+        </td>
+
+ </tr>
+</table>
+Журнал действий
+@log
+
+
+
+@code{
+
+    public EventCallback buy(int Id)
+    {
+        log += "Купили - "+Id.ToString()+" <br>";
+        Id = Math.Abs(Id);
+        //проверка перед транзакцией
+
+        VeningDatabase database = new VeningDatabase();
+        Good for_sale  = database.warhouse.Where<Good>(i => i.Id == Id && i.Count>0).Single<Good>();
+        //Если товара хватает и он есть
+        if (for_sale != null)
+        {
+
+            //юююю продажи
+
+        }
+        else { log += "Товар"; }
+
+        database.SaveChanges();
+        database.Dispose();
+
+        return (new EventCallback());
+    }
+
+    public void toss_a_coin()
+    {
+        VeningDatabase database = new VeningDatabase();
+        database.coins.Add(new Coin(1, Storage.cash));
+        database.SaveChanges();
+        database.Dispose();
+
+        sum_in_cache = Update_sum_in_cache();
+        sum_in_payback = Update_sum_in_payback();
+
+    }
+
+
+    public void toss_a_coin_5()
+    {
+        VeningDatabase database = new VeningDatabase();
+        database.coins.Add(new Coin(5, Storage.cash));
+        database.SaveChanges();
+        database.Dispose();
+
+        sum_in_cache = Update_sum_in_cache();
+        sum_in_payback = Update_sum_in_payback();
+
+    }
+
+    /// <summary>
+    /// сбрасываем что в приемнике в лоток
+    /// </summary>
+    public void drop_a_coin ()
+    {
+        VeningDatabase database = new VeningDatabase();
+        foreach (Coin in_cache in database.coins.Where<Coin>(i => (i.storage == Storage.cash)))
+        {
+            in_cache.storage = Storage.payback;    
+
+        }
+        database.SaveChanges();
+        database.Dispose();
+
+        sum_in_cache = Update_sum_in_cache();
+        sum_in_payback = Update_sum_in_payback();
+
+    }
+
+    public void take_a_coin()
+    {
+        //удаляем из базы все что в лотке
+        VeningDatabase database = new VeningDatabase();
+        database.coins.RemoveRange(database.coins.Where<Coin>(i => i.storage == Storage.payback).ToArray());
+        database.SaveChanges();
+        database.Dispose();
+
+        sum_in_cache = Update_sum_in_cache();
+        sum_in_payback = Update_sum_in_payback();
+
+    }
+
+}
