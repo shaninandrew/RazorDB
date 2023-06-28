@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "JoVTePRRQ9nt29iidrzE2SvQxHfWwJq+AfBIVcw04TY=",
+  "Hash": "K0aHanuuFBhv1C4inwwFYNiOAF17T9Jmon/mzRVYrFo=",
   "Source": "BZI",
   "BasePath": "_content/BZI",
   "Mode": "Default",
@@ -16,6 +16,23 @@
     }
   ],
   "Assets": [
+    {
+      "Identity": "C:\\Users\\Шанин\\Documents\\личное\\learn entities\\RazorDB\\wwwroot\\admin\\Admin.razor",
+      "SourceId": "BZI",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\Шанин\\Documents\\личное\\learn entities\\RazorDB\\wwwroot\\",
+      "BasePath": "_content/BZI",
+      "RelativePath": "admin/Admin.razor",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\admin\\Admin.razor"
+    },
     {
       "Identity": "C:\\Users\\Шанин\\Documents\\личное\\learn entities\\RazorDB\\wwwroot\\css\\site.css",
       "SourceId": "BZI",

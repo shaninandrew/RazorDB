@@ -1,0 +1,167 @@
+﻿@using BZI.wwwroot.admin
+@using BZI
+@using BZI.Pages
+@using BZI.wwwroot
+@inherits LayoutComponentBase
+
+@page "/admin"
+<a href="/">Режим автомата</a> | <a href="/admin">Режим администратора</a>
+<h1>Панель администратора</h1>
+
+
+@code 
+{
+
+
+    public static string test = "проверка";
+
+    /// <summary>
+    /// Обновляет кол-во товара на лету
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="value"></param>
+    /// <returns></returns>
+    static  EventCallback set_count(int id, string value)
+    {
+
+        test = "Кол-во "+value + " // id = "+id.ToString()       ;
+
+        VeningDatabase database = new VeningDatabase();
+
+        database.warhouse.Single<Good>(x => x.Id == id).Count =int.Parse( value);
+        database.SaveChanges();
+        database.Dispose();
+
+        EventCallback e = new EventCallback();
+
+        return (e);
+    }
+    /// <summary>
+    /// Обновляет имя на лету
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="value"></param>
+    /// <returns></returns>
+    static EventCallback set_name(int id, string value)
+    {
+
+        test = "Имя " + value + " //  id = " + id.ToString(); ;
+
+        VeningDatabase database = new VeningDatabase();
+        database.warhouse.Single<Good>(x => x.Id == id).Name = value;
+        database.SaveChanges();
+        database.Dispose();
+
+        EventCallback e = new EventCallback();
+        return (e);
+    }
+
+    /// <summary>
+    /// Обновляет цену на лету
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="value"></param>
+    /// <returns></returns>
+    static  EventCallback set_price(int id, string value)
+    {
+
+        test = "Цена " + value + " //  id = " +  id.ToString(); ;
+
+        VeningDatabase database = new VeningDatabase();
+        database.warhouse.Single<Good>(x => x.Id == id).Price = int.Parse(value);
+        database.SaveChanges();
+        database.Dispose();
+
+
+        EventCallback e = new EventCallback();
+
+        return (e);
+    }
+
+
+    static public void add_row()
+    {
+        VeningDatabase database = new VeningDatabase();
+        Good x= database.warhouse.Add(new Good()).Entity;
+        // database.warhouse.Update(x);
+
+        database.SaveChanges();
+        database.Dispose();
+
+    }
+
+    static EventCallback delete_row(int id ,bool? can_do_it)
+    {
+        EventCallback e1 = new EventCallback();
+        if (can_do_it == null)
+        {
+            
+            return (e1);
+
+        }
+
+        test = "Удалить  id = " + id.ToString(); ;
+        if (can_do_it.Value)
+        {
+            VeningDatabase database = new VeningDatabase();
+            database.warhouse.Remove(database.warhouse.Single<Good>(x => x.Id == id));
+            database.SaveChanges();
+            database.Dispose();
+        }
+
+      
+        return (e1);
+    }
+
+}
+
+Последняя операция  -  @test <br />
+
+
+<button @onclick="async () => add_row()">Добавить новую запись</button>
+
+<table>
+  
+     <tr>
+        <td># </td>
+        <td>Имя товара </td>
+        <td>Цена, р. </td>
+        <td>Кол-во товара, шт. </td>
+        <td></td>
+    </tr>
+
+@code{
+       
+static VeningDatabase database = new VeningDatabase();
+}
+
+
+
+@foreach (Good gs in database.warhouse.OrderBy(i=> i.Id) )
+{
+            <tr>
+                <td>
+                <a > @gs.Id</a>
+                </td>
+
+                <td>
+                <input name="Name_@gs.Id" type="text" value="@gs.Name" @onchange="@((ChangeEventArgs __e) => set_name(gs.Id, __e.Value.ToString() ) )" />
+                </td>
+
+                <td>
+                <input name="Price_@gs.Id" type="number" value="@gs.Price" @onchange="@((ChangeEventArgs __e) => set_price(gs.Id, __e.Value.ToString() ) )" />
+                </td>
+            
+                <td>
+                <input name="Count_@gs.Id" type="number" min="1" max="1000" value="@gs.Count" @onchange="@((ChangeEventArgs __e) => set_count(gs.Id, __e.Value.ToString() ) )" />
+                </td>
+
+              <td>
+                <button @onclick="@(async () =>  delete_row (gs.Id,true))" accesskey="e">-</button>
+
+              </td>
+            </tr>
+
+    } 
+  </table>
+

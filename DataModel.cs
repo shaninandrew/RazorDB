@@ -39,6 +39,8 @@ namespace BZI
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Password=1231;User ID=postgres;Database=vending");
+            
+            //optionsBuilder.UseSqlServer(".... Database=vending");
 
             base.OnConfiguring(optionsBuilder);
         }

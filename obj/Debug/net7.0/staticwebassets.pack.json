@@ -1,6 +1,10 @@
 {
   "Files": [
     {
+      "Id": "C:\\Users\\Шанин\\Documents\\личное\\learn entities\\RazorDB\\wwwroot\\admin\\Admin.razor",
+      "PackagePath": "staticwebassets\\admin\\Admin.razor"
+    },
+    {
       "Id": "C:\\Users\\Шанин\\Documents\\личное\\learn entities\\RazorDB\\wwwroot\\css\\site.css",
       "PackagePath": "staticwebassets\\css\\site.css"
     },

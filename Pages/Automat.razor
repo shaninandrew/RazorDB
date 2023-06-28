@@ -1,0 +1,368 @@
+﻿@page "/"
+
+<a href="/">Режим автомата</a> | <a href="/admin">Режим администратора</a>
+
+@code{
+    static int sum_in_cache = Update_sum_in_cache();
+    static int sum_in_bank = Update_sum_in_bank();
+    static int sum_in_payback = Update_sum_in_payback();
+
+
+
+    /// <summary>
+    /// Журнал событий для отладки
+    /// </summary>
+
+    static string log = "";
+
+
+    static public void SendRequs2TechSupport()
+    {
+        ///....
+        /// направляет запрос в тех поддержку
+    }
+
+    static public int Update_sum_in_cache()
+    {
+        VeningDatabase database = new VeningDatabase();
+        int _sum_in_cache = database.coins.Where<Coin>(i => i.storage == Storage.cash).Sum<Coin>(i => i.CoinNum);
+        database.Dispose();
+        return (_sum_in_cache);
+    }
+
+    static public int Update_sum_in_payback()
+    {
+        VeningDatabase database = new VeningDatabase();
+        int _sum_in_pb = database.coins.Where<Coin>(i => i.storage == Storage.payback).Sum<Coin>(i => i.CoinNum);
+        database.Dispose();
+        return (_sum_in_pb);
+    }
+
+    static public int Update_sum_in_bank()
+    {
+        VeningDatabase database = new VeningDatabase();
+        int _sum_in_bank = database.coins.Where<Coin>(i => i.storage == Storage.bank).Sum<Coin>(i => i.CoinNum);
+        database.Dispose();
+
+        return (_sum_in_bank);
+    }
+
+
+    static public List<Good> ShowGoods()
+    {
+        //сколько денег доступно
+        int avail_money = Update_sum_in_cache();
+
+        VeningDatabase database = new VeningDatabase();
+
+        List<Good> result = new List<Good>();
+
+        //отбираем товары на которые хватает денег
+        //случай параллельной обработки тут не принимаем - она будет в продаже
+        foreach (Good g in database.warhouse)
+        {
+            if ((g.Price <= avail_money) && (g.Count>0))
+                result.Add(g);
+        }
+        database.Dispose(); //от утечек памяти
+
+        return (result);
+    }
+
+
+
+    /// <summary>
+    /// Функция купить товар
+    /// </summary>
+    /// <param name="Id"></param>
+    /// <returns></returns>
+    public EventCallback buy(int Id)
+    {
+        log = "Нажали на заказ - " + Id.ToString() + " \r\n" + log;
+        Id = Math.Abs(Id);
+        //проверка перед транзакцией
+
+        VeningDatabase database = new VeningDatabase();
+        Good for_sale = database.warhouse.Where<Good>(i => i.Id == Id && i.Count > 0).Single<Good>();
+        //Если товара хватает и он есть
+        if (for_sale != null)
+        {
+            int money_have = database.coins.Where<Coin>(i => i.storage == Storage.cash).Sum<Coin>(i => i.CoinNum);
+            if ((for_sale.Price <= money_have) && (for_sale.Count > 0))
+            {
+                //Продаем товар со склада
+                // рано! for_sale.Count--;
+
+
+                //пересчитываем монеты которыми можно забрать в банк
+                IOrderedQueryable<Coin> sorted_cache = database.coins.Where<Coin>(i => i.storage == Storage.cash).OrderByDescending(coin => coin.CoinNum);
+
+                // пересчитываем монеты
+                int compare_sum = 0;
+
+                //сдача
+                int pay_out = 0;
+
+                //индексы забираемых монет
+                List<int> Ids = new List<int>();
+                Ids.Clear();
+
+                bool transac_money = true;
+                /// обходим монеты со старшей чтобы забрать
+                foreach (Coin cassir in sorted_cache)
+                {
+                    compare_sum += cassir.CoinNum;
+                    //типа монетка помечается что заберем ее
+                    Ids.Add(cassir.Id);
+
+                    if (compare_sum >= for_sale.Price)
+                    {
+                        pay_out = compare_sum - for_sale.Price;
+
+
+                        transac_money = true;
+                        log = "Товар может быть выдан: " + for_sale.Name + " цена " + for_sale.Price.ToString() + "\r\n" + log;
+                        break;
+                    }
+
+                }//foreach
+
+
+
+                if (transac_money)
+                {
+                    string DEBUG_MSG = "";
+
+                    transac_money = false;
+
+                    //Перечисляем деньги на счет в банк
+                    foreach (Coin cassir in sorted_cache)
+                    {
+                        if (Ids.IndexOf(cassir.Id) > -1)
+                        {
+                            cassir.storage = Storage.bank;
+                            DEBUG_MSG += cassir.Id + " ("+cassir.CoinNum+")   ";
+                        }
+
+                    }
+                    log = "\r\n В банк перешли монеты: "+ DEBUG_MSG +"\r\n" + log;
+                    Ids.Clear();
+
+                    log="Сдача ожидается "+pay_out.ToString()+" р \r\n " + log;
+
+                    //выдаем товар!
+                    for_sale.Count--;
+                    log = "*** Товар выдан " + for_sale.Name + ". Цена: " + for_sale.Price.ToString() + " р. \r\n" + log;
+
+                    //теперь выдать сдачу, только сортируем от мелких к большим монетам, чтобы не дать лишнего
+                    IOrderedQueryable<Coin> sorted_pay_out = database.coins.Where<Coin>(i => i.storage != Storage.payback).OrderBy(coin => coin.CoinNum);
+                    DEBUG_MSG = " Для выдачи доступно "+sorted_pay_out.Count<Coin>().ToString()  +" монет. В лоток сдачи ушли ";
+                    int compare_payout = 0;
+                    int count_coins_to_pay = 0;
+                    foreach (Coin cassir in sorted_pay_out)
+                    {
+                        //если монета не в лотке для сдачи
+                        if (cassir.storage != Storage.payback)
+                        {
+                            //набор монет
+
+
+                            //если сдачу не набрали, То кидаем монету в лоток сдачи
+                            if ((compare_payout <= pay_out) && (cassir.CoinNum<=pay_out))
+                            {
+                                count_coins_to_pay++;
+                                compare_payout += cassir.CoinNum;
+                                cassir.storage = Storage.payback;
+                                DEBUG_MSG += " -> " + cassir.Id.ToString() + " (" + cassir.CoinNum.ToString() + "р) / ";
+                            }
+
+                            //иначе все
+                            if (compare_payout >= pay_out)
+                            { break; }
+                        }
+
+                    } //foreach
+
+
+                    if (count_coins_to_pay == 0 && pay_out > 0)
+                    {
+                        log = "Извните, но сдачи нет! Позвоните в тех поддержку по номеру +79996661122 для возврата денег.\r\n" + log;
+                        log = "Запрос в службу техподдержки направлен. \r\n" + log;
+                        //сообщение в службу
+                        SendRequs2TechSupport();
+
+                    }
+                    else
+                    {
+                        log = "Сдача передана " + pay_out.ToString() + " р. Монеты - [ " + DEBUG_MSG + " ] \r\n" + log;
+                    }
+
+
+                    
+                    database.SaveChanges();
+                    transac_money = true;
+
+                }//if
+
+
+            }
+            else
+            {
+                log = "У вас деньги выпали!\r\n" + log;
+
+            }
+            //юююю продажи
+
+        }
+        else { log += "Товар"; }
+
+        database.SaveChanges();
+        database.Dispose();
+
+        // обновляем состояния
+
+        sum_in_cache = Update_sum_in_cache();
+        sum_in_bank = Update_sum_in_bank();
+        sum_in_payback = Update_sum_in_payback();
+
+        return (new EventCallback());
+    }
+
+    static public void toss_a_coin_1()
+    {
+        toss_a_coin(1);
+
+        log = "+1 монета \r\n" + log;
+    }
+
+    static public void toss_a_coin_2()
+    {
+        toss_a_coin(2);
+        log = "+2 монета \r\n" + log;
+    }
+
+    static public void toss_a_coin_5()
+    {
+        toss_a_coin(5);
+        log = "+5 монета \r\n" + log;
+    }
+
+
+
+    static private void toss_a_coin(int coin)
+    {
+        VeningDatabase database = new VeningDatabase();
+        database.coins.Add(new Coin(coin, Storage.cash));
+        database.SaveChanges();
+        database.Dispose();
+
+        sum_in_cache = Update_sum_in_cache();
+        sum_in_bank = Update_sum_in_bank();
+        sum_in_payback = Update_sum_in_payback();
+
+       // Index.log = "Обновление стутаус \r\n" + log;
+
+    }
+
+
+
+    /// <summary>
+    /// сбрасываем что в приемнике в лоток
+    /// </summary>
+    public void drop_a_coin()
+    {
+        VeningDatabase database = new VeningDatabase();
+
+        //Лямбда для перевода кэша в сдачу
+        database.coins.Where<Coin>(i => (i.storage == Storage.cash)).ToList().ForEach(i => i.storage = Storage.payback);
+        database.SaveChanges();
+
+        database.Dispose();
+
+        sum_in_cache = Update_sum_in_cache();
+        sum_in_bank = Update_sum_in_bank();
+        sum_in_payback = Update_sum_in_payback();
+    }
+
+    public void take_a_coin()
+    {
+        //удаляем из базы все что в лотке
+        VeningDatabase database = new VeningDatabase();
+        foreach (Coin coin in database.coins.Where<Coin>(i => (i.storage == Storage.payback)))
+        {
+            database.coins.Remove(coin);
+        }
+        //database.coins.RemoveRange(database.coins.Where<Coin>(i => i.storage == Storage.payback).ToArray());
+        database.SaveChanges();
+        database.Dispose();
+
+        sum_in_cache = Update_sum_in_cache();
+        sum_in_bank = Update_sum_in_bank();
+        sum_in_payback = Update_sum_in_payback();
+    }
+
+
+}
+
+<div>
+<h1>Вендинговый аппарат</h1>
+</div>
+<table>
+ <tr>
+
+ <td valign="top">
+<div>
+ <b>Кол-во монет в </b>
+<table valign="center">
+    <tr> <td> приемнике</td>        <td> банке</td>                  <td>лотке </td>  </tr>
+    <tr> <td> @sum_in_cache</td>    <td> @sum_in_bank </td>          <td> @sum_in_payback </td> </tr>
+</table>
+</div>
+
+<div>
+   Опустить монетку (Alt+1/2/5)<br />
+<button @onclick="toss_a_coin_1" accesskey="1" >+ <u>1</u>р</button> |
+<button @onclick="toss_a_coin_2" accesskey="2">+ <u>2</u>р</button> |
+<button @onclick="toss_a_coin_5" accesskey="5">+ <u>5</u>р</button> 
+</div>
+
+<br />
+<br />
+<div>
+<button @onclick="drop_a_coin" accesskey="D">Отдать сдачу <u>D</u></button>
+ В лотке @sum_in_payback рублей.
+ <BR />
+</div>
+<br />
+<button enabled="@sum_in_payback==0" @onclick="take_a_coin" accesskey="T">Забрать сдачу <u>T</u></button>
+</td>
+<td valign="top">
+
+            <b>Товары</b><br />
+            <table>
+
+            @foreach (Good g in ShowGoods())
+            {
+                <tr>
+                        <td>   <span> @g.Name</span> </td>
+                        <td> <span>@g.Price р. </span>  </td>
+                        <td>    <span>@g.Count шт.  </span> </td>
+                
+                        <td> <button @onclick="@(()=>buy(@g.Id))">Купить</button> <br /> </td>
+                    </tr>
+            }
+            </table>
+          
+        </td>
+
+ </tr>
+</table>
+<span>
+Журнал действий <br />
+<textarea style="width:500px; height:300px;">@log</textarea>
+</span>
+
+
+@code{
+  
+}
